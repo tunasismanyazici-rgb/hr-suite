@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { legalDocuments, type LegalDocumentKey } from "@/lib/legal/texts";
+import { UploadForm } from "./upload-form";
 
 function ConsentRow({
   id,
@@ -103,16 +104,7 @@ export function OnayForm() {
   }
 
   if (success) {
-    return (
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle>Onaylarınız kaydedildi</CardTitle>
-          <CardDescription>
-            Dosya yükleme adımı yakında burada aktif olacak.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
+    return <UploadForm />;
   }
 
   return (
