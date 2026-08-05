@@ -13,108 +13,106 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-const BEKLEME_SANIYE = 60;
-const SON_ISTEK_ANAHTARI = "basvuru-son-otp-istegi";
+const COOLDOWN_SECONDS = 60;
+const LAST_REQUEST_KEY = "basvuru-son-otp-istegi";
 
-type SonIstek = { eposta: string; zaman: number };
+type LastRequest = { email: string; timestamp: number };
 
-function sonIstegiOku(): SonIstek | null {
+function readLastRequest(): LastRequest | null {
   try {
-    const ham = window.localStorage.getItem(SON_ISTEK_ANAHTARI);
-    return ham ? (JSON.parse(ham) as SonIstek) : null;
+    const raw = window.localStorage.getItem(LAST_REQUEST_KEY);
+    return raw ? (JSON.parse(raw) as LastRequest) : null;
   } catch {
     return null;
   }
 }
 
-function hataMesajiUret(mesaj: string): string {
-  const kucukHarfli = mesaj.toLowerCase();
-  if (kucukHarfli.includes("rate limit") || kucukHarfli.includes("too many")) {
+function buildErrorMessage(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes("rate limit") || lower.includes("too many")) {
     return "Çok fazla istek gönderildi. Lütfen bir süre sonra tekrar deneyin.";
   }
-  if (kucukHarfli.includes("email") && kucukHarfli.includes("invalid")) {
+  if (lower.includes("email") && lower.includes("invalid")) {
     return "Geçerli bir e-posta adresi girin.";
   }
   return "Bağlantı gönderilemedi. Lütfen tekrar deneyin.";
 }
 
-const SUNUCU_HATA_MESAJLARI: Record<string, string> = {
-  dogrulama: "Giriş bağlantısı doğrulanamadı ya da süresi dolmuş. Lütfen tekrar deneyin.",
+const SERVER_ERROR_MESSAGES: Record<string, string> = {
+  verification: "Giriş bağlantısı doğrulanamadı ya da süresi dolmuş. Lütfen tekrar deneyin.",
 };
 
-export function BasvuruForm({ baslangicHatasi }: { baslangicHatasi?: string }) {
-  const [eposta, setEposta] = useState("");
-  const [durum, setDurum] = useState<"bekliyor" | "gonderiliyor" | "gonderildi">(
-    "bekliyor"
-  );
-  const [hata, setHata] = useState<string | null>(
-    baslangicHatasi
-      ? SUNUCU_HATA_MESAJLARI[baslangicHatasi] ?? "Bir hata oluştu. Lütfen tekrar deneyin."
+export function BasvuruForm({ initialError }: { initialError?: string }) {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
+  const [error, setError] = useState<string | null>(
+    initialError
+      ? SERVER_ERROR_MESSAGES[initialError] ?? "Bir hata oluştu. Lütfen tekrar deneyin."
       : null
   );
-  const [kalanSaniye, setKalanSaniye] = useState(0);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   useEffect(() => {
-    if (kalanSaniye <= 0) return;
-    const zamanlayici = setInterval(() => {
-      setKalanSaniye((onceki) => (onceki <= 1 ? 0 : onceki - 1));
+    if (cooldownSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setCooldownSeconds((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
-    return () => clearInterval(zamanlayici);
-  }, [kalanSaniye]);
+    return () => clearInterval(interval);
+  }, [cooldownSeconds]);
 
-  function epostaDegisti(deger: string) {
-    setEposta(deger);
-    const normalize = deger.trim().toLowerCase();
-    if (!normalize) {
-      setKalanSaniye(0);
+  function handleEmailChange(value: string) {
+    setEmail(value);
+    const normalizedEmail = value.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setCooldownSeconds(0);
       return;
     }
-    const sonIstek = sonIstegiOku();
-    if (sonIstek && sonIstek.eposta === normalize) {
-      const gecenSaniye = Math.floor((Date.now() - sonIstek.zaman) / 1000);
-      setKalanSaniye(Math.max(0, BEKLEME_SANIYE - gecenSaniye));
+    const lastRequest = readLastRequest();
+    if (lastRequest && lastRequest.email === normalizedEmail) {
+      const elapsedSeconds = Math.floor((Date.now() - lastRequest.timestamp) / 1000);
+      setCooldownSeconds(Math.max(0, COOLDOWN_SECONDS - elapsedSeconds));
     } else {
-      setKalanSaniye(0);
+      setCooldownSeconds(0);
     }
   }
 
-  async function gonder(olay: React.FormEvent) {
-    olay.preventDefault();
-    const normalize = eposta.trim().toLowerCase();
-    if (!normalize || kalanSaniye > 0 || durum === "gonderiliyor") return;
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || cooldownSeconds > 0 || status === "sending") return;
 
-    setHata(null);
-    setDurum("gonderiliyor");
+    setError(null);
+    setStatus("sending");
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: normalize,
+    const { error: signInError } = await supabase.auth.signInWithOtp({
+      email: normalizedEmail,
       options: {
         emailRedirectTo: `${window.location.origin}/basvuru/dogrula`,
       },
     });
 
-    if (error) {
-      setHata(hataMesajiUret(error.message));
-      setDurum("bekliyor");
+    if (signInError) {
+      setError(buildErrorMessage(signInError.message));
+      setStatus("idle");
       return;
     }
 
     window.localStorage.setItem(
-      SON_ISTEK_ANAHTARI,
-      JSON.stringify({ eposta: normalize, zaman: Date.now() } satisfies SonIstek)
+      LAST_REQUEST_KEY,
+      JSON.stringify({ email: normalizedEmail, timestamp: Date.now() } satisfies LastRequest)
     );
-    setKalanSaniye(BEKLEME_SANIYE);
-    setDurum("gonderildi");
+    setCooldownSeconds(COOLDOWN_SECONDS);
+    setStatus("sent");
   }
 
-  if (durum === "gonderildi") {
+  if (status === "sent") {
     return (
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>E-posta adresinize giriş bağlantısı gönderildi</CardTitle>
           <CardDescription>
-            {eposta} adresine gönderdiğimiz bağlantıya tıklayarak başvurunuza devam
+            {email} adresine gönderdiğimiz bağlantıya tıklayarak başvurunuza devam
             edebilirsiniz.
           </CardDescription>
         </CardHeader>
@@ -122,7 +120,7 @@ export function BasvuruForm({ baslangicHatasi }: { baslangicHatasi?: string }) {
           <Button
             variant="outline"
             className="w-full"
-            onClick={() => setDurum("bekliyor")}
+            onClick={() => setStatus("idle")}
           >
             Farklı bir e-posta adresi kullan
           </Button>
@@ -140,7 +138,7 @@ export function BasvuruForm({ baslangicHatasi }: { baslangicHatasi?: string }) {
           gönderelim.
         </CardDescription>
       </CardHeader>
-      <form onSubmit={gonder}>
+      <form onSubmit={handleSubmit}>
         <CardContent className="flex flex-col gap-3">
           <Input
             type="email"
@@ -148,22 +146,22 @@ export function BasvuruForm({ baslangicHatasi }: { baslangicHatasi?: string }) {
             autoComplete="email"
             inputMode="email"
             placeholder="ornek@eposta.com"
-            value={eposta}
-            onChange={(olay) => epostaDegisti(olay.target.value)}
-            disabled={durum === "gonderiliyor"}
+            value={email}
+            onChange={(event) => handleEmailChange(event.target.value)}
+            disabled={status === "sending"}
           />
-          {hata && <p className="text-sm text-destructive">{hata}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </CardContent>
         <CardFooter>
           <Button
             type="submit"
             className="w-full"
-            disabled={durum === "gonderiliyor" || kalanSaniye > 0 || !eposta.trim()}
+            disabled={status === "sending" || cooldownSeconds > 0 || !email.trim()}
           >
-            {durum === "gonderiliyor"
+            {status === "sending"
               ? "Gönderiliyor..."
-              : kalanSaniye > 0
-                ? `Tekrar denemek için ${kalanSaniye} sn bekleyin`
+              : cooldownSeconds > 0
+                ? `Tekrar denemek için ${cooldownSeconds} sn bekleyin`
                 : "Giriş bağlantısı gönder"}
           </Button>
         </CardFooter>

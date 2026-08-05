@@ -1,15 +1,15 @@
 import { BasvuruForm } from "./basvuru-form";
 
-export default async function BasvuruSayfasi({
+export default async function BasvuruPage({
   searchParams,
 }: {
-  searchParams: Promise<{ hata?: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
-  const { hata } = await searchParams;
+  const { error } = await searchParams;
 
   return (
     <div className="flex flex-1 items-center justify-center bg-zinc-50 px-4 py-12 dark:bg-black">
-      <BasvuruForm baslangicHatasi={hata} />
+      <BasvuruForm initialError={error} />
     </div>
   );
 }

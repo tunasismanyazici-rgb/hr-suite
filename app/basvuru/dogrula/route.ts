@@ -13,5 +13,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/basvuru?hata=dogrulama`);
+  return NextResponse.redirect(`${origin}/basvuru?error=verification`);
 }
