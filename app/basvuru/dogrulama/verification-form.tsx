@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -296,6 +298,19 @@ export function VerificationForm({
             Başvurunuz İK ekibimize iletildi. Değerlendirme sonucu size bildirilecektir.
           </CardDescription>
         </CardHeader>
+        <CardFooter className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            render={<Link href="/basvuru" />}
+            nativeButton={false}
+            variant="outline"
+            className="w-full"
+          >
+            Ana sayfaya dön
+          </Button>
+          <Button render={<Link href="/basvuru/durum" />} nativeButton={false} className="w-full">
+            Durumu görüntüle
+          </Button>
+        </CardFooter>
       </Card>
     );
   }
