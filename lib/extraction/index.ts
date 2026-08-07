@@ -31,4 +31,10 @@ export { detectSourceType } from "./detect-source-type";
 export { extractFromDigitalPdf } from "./digital-pdf";
 export { extractFromDocx } from "./docx";
 export { extractWithVision } from "./vision";
+export { extractStructuredData, EXTRACTION_MODEL } from "./structure";
 export type { SourceType, ExtractionResult, TextExtractionResult } from "./types";
+export type {
+  StructuredCandidateData,
+  StructuredExtractionResult,
+  ExtractionUsage,
+} from "./structure";

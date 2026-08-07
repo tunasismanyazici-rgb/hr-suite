@@ -28,6 +28,12 @@ NOT: src/ klasörü yok, app/ doğrudan kökte.
 - Eşleştirme skoru LLM tarafından sıfırdan üretilmez; deterministik hesaplanır,
   LLM yalnızca sınırlı düzeltme ve gerekçe üretir
 - Yeni paket kurulmadan önce gerekçesi belirtilir
+- .env.local dosyası Read tool ile (veya cat gibi tüm içeriği basan
+  komutlarla) okunmaz — sırların transkript'e/context'e sızmasını önlemek
+  için. Yeni değişken eklemek gerekirse bash ile append edilir:
+  echo 'YENI_DEGISKEN=' >> .env.local
+  Mevcut bir değeri kontrol etmek gerekirse sadece değişken adı/uzunluğu
+  gibi maskelenmiş bilgi gösterilir, değerin kendisi asla basılmaz.
 
 ## Çalışma biçimi
 - Her faz ayrı branch'te ilerler

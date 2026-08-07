@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { compressImage, isCompressibleImage } from "@/lib/image/compress-image";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = ["pdf", "docx", "jpg", "jpeg", "png"];
@@ -76,18 +77,36 @@ export function UploadForm() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [sizeNotice, setSizeNotice] = useState<string | null>(null);
 
-  function handleFileSelected(file: File) {
+  async function handleFileSelected(file: File) {
     const validationError = validateFile(file);
     if (validationError) {
       setError(validationError);
       setSelectedFile(null);
+      setSizeNotice(null);
       return;
     }
     setError(null);
-    setSelectedFile(file);
+    setSizeNotice(null);
+
+    if (!isCompressibleImage(file)) {
+      setSelectedFile(file);
+      return;
+    }
+
+    setOptimizing(true);
+    const result = await compressImage(file);
+    setOptimizing(false);
+    setSelectedFile(result.file);
+    if (result.compressed) {
+      setSizeNotice(
+        `${formatFileSize(result.originalSize)} → ${formatFileSize(result.newSize)} olarak optimize edildi`
+      );
+    }
   }
 
   function handleDrop(event: React.DragEvent<HTMLDivElement>) {
@@ -100,6 +119,7 @@ export function UploadForm() {
   function handleRemove() {
     setSelectedFile(null);
     setError(null);
+    setSizeNotice(null);
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -119,6 +139,16 @@ export function UploadForm() {
         return;
       }
 
+      if (body.document_id) {
+        // Yanıt beklenmiyor: işleme arka planda sürüyor, durum sayfası
+        // zaten polling ile sonucu takip edecek.
+        fetch("/api/basvuru/isle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ document_id: body.document_id }),
+        }).catch(() => {});
+      }
+
       router.push("/basvuru/durum");
     } catch {
       setError("Bağlantı hatası oluştu. Lütfen tekrar deneyin.");
@@ -136,7 +166,14 @@ export function UploadForm() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {!selectedFile && (
+        {optimizing && (
+          <div className="flex items-center justify-center gap-2 rounded-lg border border-input px-4 py-10 text-sm text-muted-foreground">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+            Görsel optimize ediliyor...
+          </div>
+        )}
+
+        {!selectedFile && !optimizing && (
           <div
             onDragOver={(event) => {
               event.preventDefault();
@@ -179,6 +216,9 @@ export function UploadForm() {
               <span className="text-xs text-muted-foreground">
                 {formatFileSize(selectedFile.size)}
               </span>
+              {sizeNotice && (
+                <span className="text-xs text-muted-foreground">{sizeNotice}</span>
+              )}
             </div>
             {!uploading && (
               <Button variant="ghost" size="sm" onClick={handleRemove}>
@@ -207,7 +247,7 @@ export function UploadForm() {
       <CardFooter>
         <Button
           className="w-full"
-          disabled={!selectedFile || uploading}
+          disabled={!selectedFile || uploading || optimizing}
           onClick={handleUpload}
         >
           {uploading ? "Yükleniyor..." : "Yükle"}

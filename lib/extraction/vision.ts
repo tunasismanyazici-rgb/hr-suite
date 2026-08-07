@@ -1,3 +1,4 @@
+import "./pdf-worker-setup";
 import { ImageAnnotatorClient } from "@google-cloud/vision";
 import { PDFParse } from "pdf-parse";
 import type { ExtractionResult } from "./types";

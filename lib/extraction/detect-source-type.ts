@@ -1,3 +1,4 @@
+import "./pdf-worker-setup";
 import { PDFParse } from "pdf-parse";
 import { DOCX_MIME_TYPE, type SourceType } from "./types";
 
